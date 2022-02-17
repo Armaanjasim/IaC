@@ -1,0 +1,14 @@
+# yml file to copy over file
+---
+
+- hosts: web
+
+  gather_facts: yes
+
+  become: true
+
+  tasks:
+  - name: copying file over to web VM
+    copy:
+      src: /home/vagrant/app
+      dest: /home/vagrant/

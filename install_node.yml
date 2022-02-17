@@ -1,0 +1,14 @@
+# yml installing node and npm and starting app
+---
+- hosts: web
+  gather_facts: yes
+  become: true
+  tasks:
+  - name: Curling the right version
+    shell: curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
+  - name: Installing Nodejs
+    apt: pkg=nodejs state=present
+  - name: Installing NPM
+    apt: pkg=npm state=present
+  - name: Running Application
+    shell: cd app; npm install; screen -d -m npm start

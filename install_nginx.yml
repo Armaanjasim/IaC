@@ -1,0 +1,20 @@
+# YAML/YML file to create a playbook to configure nginx in our web using playbook
+---
+# It starts with three dashes
+
+# add the name of the host/instance/vm
+- hosts: web
+
+# collect logs or gather facts -
+  gather_facts: yes
+
+# we need admin access to install anything
+  become: true
+
+# add the instructions - install nginx - in web server
+  tasks:
+  - name: Installing Nginx web-server in our app machine
+    apt: pkg=nginx state=present
+
+# HINT: be mindful of intendentation
+# use 2 spaces - avoid using tab
