@@ -1,9 +1,10 @@
 # IAC with Ansible
+![Ansible](Ansible.PNG)
 
+## Table Of Contents
 
-### Let's create Vagrantfile to create Three VMs for Ansible architecture
-#### Ansible controller and Ansible agents 
-
+## Creating A Vagrantfile For Three VMs For Ansible architecture
+### Ansible controller and Ansible agents 
 ```
 
 # -*- mode: ruby -*-
@@ -61,8 +62,8 @@
  end
 ```
 
-# Infrastructure as Code (IaC)
-## Ansible & Terraform
+## Infrastructure as Code (IaC)
+### Ansible & Terraform
 - Configuration Management
 - Orchestration
 - Push Config - Ansible To Push To Config
