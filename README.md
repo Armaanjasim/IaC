@@ -126,6 +126,7 @@ aws_secret_key: SECRETKEY
 - After adding the aws credentials type `sudo chmod 600 pass.yml` to give permission for the file to be read. Remember to access this vault you must use `--ask-vault-<filename>` in this case it is `--ask-vault-pass`
 
 ### Playbook For Creating an EC2 Instance
+- First create a public and private key in the `.ssh` directory. Can be created by using `ssh-keygen -t rsa -b 4096`
 - create ec2 yml file:
 ```
 ---
