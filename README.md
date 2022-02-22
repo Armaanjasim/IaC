@@ -92,8 +92,75 @@
 [web]
 192.168.33.10 ansible_connection=ssh ansible_ssh_user=vagrant ansible_ssh_pass=vagrant
 [db]
-192.168.33.10 ansible_connection=ssh ansible_ssh_user=vagrant ansible_ssh_pass=vagrant
+192.168.33.11 ansible_connection=ssh ansible_ssh_user=vagrant ansible_ssh_pass=vagrant
 ```
-- `ssh vagrant@192.168.33.10`, `ssh vagrant@192.168.33.11`
 - See free storage `ansible all -a "free"`
-- copy file from one place to the other `ansible web -m copy -a "src=/etc/ansible/readme.md dest=/home/vagrant/readme.md"`
+- Copy file from one place to the other `ansible web -m copy -a "src=/etc/ansible/readme.md dest=/home/vagrant/readme.md"`
+- SSH into an agent node from the ansible controller `ssh vagrant@<ip>`
+  - - `ssh vagrant@192.168.33.10`, `ssh vagrant@192.168.33.11`
+
+
+### Ansible Playbooks
+- Playbooks used right can make automation easy, reusable and time efficent
+- Playbooks can be written in yaml/yml files that implement config management
+- The file should start with `---`
+- To run a playbook from ansible controller go to the ansible directory `/etc/ansible` & run it by using `ansible-playbook <name>.yml`. In this same directory you can directly access the shell of a node by using `ansible <host name> -a '<command example:ls>'`
+
+## Anseible Controller Hybrid
+- Setting up ansible controller as hybrid (prem-public)
+- Install required dependencies
+  - `sudo apt-get update -y && sudo apt-get upgrade -y`
+  - `sudo apt-get install tree`
+  - `sudo apt-add-repository --yes --update ppa:ansible/ansible`
+  - `sudo apt-get install ansible -y`
+  - `sudo apt-get install python3-pip`
+  - `pip3 install awscli`
+  - `pip3 install boto boto3`
+  - To check everything is installed correctly use `aws --version`
+- Create a folder in `/etc/ansible` called `groups_vars` and within this folder create another one called `all` and then finally a yml file for the vault. Example of how to create a vault is `sudo ansible-vault create pass.yml`. The `pwd` command should then show you `/etc/ansible/group_vars/all/pass.yml`.
+- In this file we want to add the aws credentials
+```
+aws_access_key: ACCESSKEY
+aws_secret_key: SECRETKEY
+```
+- After adding the aws credentials type `sudo chmod 600 pass.yml` to give permission for the file to be read. Remember to access this vault you must use `--ask-vault-<filename>` in this case it is `--ask-vault-pass`
+
+### Playbook For Creating an EC2 Instance
+- create ec2 yml file:
+```
+---
+- hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars_files:
+  - /etc/ansible/group_vars/all/pass.yml
+  tasks:
+  - ec2_key:
+      name: eng103a
+      key_material: "{{ lookup('file', '/home/vagrant/.ssh/id_rsa.pub') }}"
+      region: "eu-west-1"
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+  - ec2:
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+      key_name: eng103a
+      instance_type: t2.micro
+      image: ami-07d8796a2b0f8d29c
+      wait: yes
+      group: default
+      region: "eu-west-1"
+      count: 1
+      vpc_subnet_id: <subnet_id>
+      assign_public_ip: yes
+      instance_tags:
+        Name: ArmaanPlayBook
+
+```
+- To run this playbook use this command `sudo ansible-playbook start_ec2.yml --connection=local -e "ansible_python_interpreter=/usr/bin/python3" --ask-vault-pass -v`. To avoid using `-e ansible_python_interpreter=/usr/bin/python3` you can set an alias for python. `python=python3`
+- After this is done you can get the IP from amazon ec2 instance page and put it in the hosts file
+```
+[aws]
+<ip> ansible_connection=ssh ansible_ssh_user=ubuntu ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa.pub
+```
+- After this is done you can ping to see if theres a connection by using `sudo ansible aws -m ping --ask-vault-pass`. If pong is returned you can then run the yml files you created to download nginx, node etc on the instance. Just remember to change the hosts in the yml to match aws instead of web.
