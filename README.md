@@ -106,6 +106,58 @@
 - The file should start with `---`
 - To run a playbook from ansible controller go to the ansible directory `/etc/ansible` & run it by using `ansible-playbook <name>.yml`. In this same directory you can directly access the shell of a node by using `ansible <host name> -a '<command example:ls>'`
 
+Web Playbook
+```yml
+---
+- hosts: web
+  gather_facts: yes
+  become: yes
+  tasks:
+  -  name: syncing app folder
+     synchronize:
+       src: /home/vagrant/app
+       dest: ~/
+  -  name: load a specific version of nodejs
+     shell: curl -sl https://deb.nodesource.com/setup_6.x | sudo -E bash -
+  -  name: install the required packages
+     apt:
+       pkg:
+         - nginx
+         - nodejs
+         - npm
+       update_cache: yes
+  -  name: nginx configuration for reverse proxy
+     synchronize:
+       src: /home/vagrant/app/default
+       dest: /etc/nginx/sites-available/default
+  -  name: nginx restart
+     service: name=nginx state=restarted
+  -  name: nginx enable
+     service: name=nginx enabled=yes
+  -  name: setting db variable
+     lineinfile: dest=/home/vagrant/.bashrc line='export DB_HOST=mongodb://192.168.33.11:27017/posts'
+
+```
+
+DB Playbook
+```yml
+---
+- hosts: db
+  gather_facts: yes
+  become: true
+  tasks:
+  -  name: installing mongodb
+     apt: pkg=mongodb state=present
+  -  name: synchronize mongodb conf file
+     synchronize:
+       src: /home/vagrant/app/mongodb.conf
+       dest: /etc/
+  -  name: restart mongodb
+     service: name=mongodb state=restarted
+  -  name: enable mongodb
+     service: name=mongodb enabled=yes
+```
+
 ## Anseible Controller Hybrid
 - Setting up ansible controller as hybrid (prem-public)
 - Install required dependencies
@@ -117,7 +169,7 @@
   - `pip3 install awscli`
   - `pip3 install boto boto3`
   - To check everything is installed correctly use `aws --version`
-- Create a folder in `/etc/ansible` called `groups_vars` and within this folder create another one called `all` and then finally a yml file for the vault. Example of how to create a vault is `sudo ansible-vault create pass.yml`. The `pwd` command should then show you `/etc/ansible/group_vars/all/pass.yml`.
+- Create a folder in `/etc/ansible` called `group_vars` and within this folder create another one called `all` and then finally a yml file for the vault. Example of how to create a vault is `sudo ansible-vault create pass.yml`. The `pwd` command should then show you `/etc/ansible/group_vars/all/pass.yml`.
 - In this file we want to add the aws credentials
 ```
 aws_access_key: ACCESSKEY
@@ -158,6 +210,17 @@ aws_secret_key: SECRETKEY
         Name: ArmaanPlayBook
 
 ```
+Starting The App Playbook
+```yml
+---
+- hosts: web
+  gather_facts: yes
+  become: yes
+  tasks:
+  -  name: starting the app
+     shell:  cd app;  sudo node seeds/seed.js;  sudo npm install;  sudo screen -d -m npm start
+
+```
 - To run this playbook use this command `sudo ansible-playbook start_ec2.yml --connection=local -e "ansible_python_interpreter=/usr/bin/python3" --ask-vault-pass -v`. To avoid using `-e ansible_python_interpreter=/usr/bin/python3` you can set an alias for python. `python=python3`
 - After this is done you can get the IP from amazon ec2 instance page and put it in the hosts file
 ```
@@ -165,3 +228,100 @@ aws_secret_key: SECRETKEY
 <ip> ansible_connection=ssh ansible_ssh_user=ubuntu ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa.pub
 ```
 - After this is done you can ping to see if theres a connection by using `sudo ansible aws -m ping --ask-vault-pass`. If pong is returned you can then run the yml files you created to download nginx, node etc on the instance. Just remember to change the hosts in the yml to match aws instead of web.
+
+## Ansible Controller On AWS
+- Create an Ec2 Instance
+- Follow the steps to download the dependencies until you have created the vault. [click here to get redirected to the steps](#anseible-controller-hybrid)
+- Create an rsa key pair in the `/.ssh` using `ssh-keygen -t rsa -b 4096`
+
+create instance playbook
+```yml
+---
+- hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars_files:
+  - /etc/ansible/group_vars/all/pass.yml
+  vars:
+    ec2_instance_name: eng103a-armaan-ansible-db
+    ec2_sg_name: eng103a-armaan-vpc-db-sg
+    ec2_pem_name: eng103a-armaan
+  tasks:
+  - ec2_key:
+      name: "{{ec2_pem_name}}"
+      key_material: "{{ lookup('file', '/home/ubuntu/.ssh/id_rsa.pub') }}"
+      region: "eu-west-1"
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+  - ec2:
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+      key_name: "{{ec2_pem_name}}"
+      instance_type: t2.micro
+      image: ami-07d8796a2b0f8d29c
+      wait: yes
+      group: "{{ec2_sg_name}}"
+      region: "eu-west-1"
+      count: 1
+      vpc_subnet_id: subnet-0624fd8b23c534077
+      assign_public_ip: yes
+      instance_tags:
+        Name: "{{ec2_instance_name}}"
+
+```
+
+ App dependencies
+```yml
+---
+- hosts: app
+  gather_facts: yes
+  become: yes
+  tasks:
+  -  name: syncing app folder
+     synchronize:
+       src: /home/ubuntu/app
+       dest: ~/
+  -  name: load a specific version of nodejs
+     shell: curl -sl https://deb.nodesource.com/setup_6.x | sudo -E bash -
+  -  name: install the required packages
+     apt:
+       pkg:
+         - nginx
+         - nodejs
+         - npm
+       update_cache: yes
+  -  name: nginx configuration for reverse proxy
+     synchronize:
+       src: /home/ubuntu/app/default
+       dest: /etc/nginx/sites-available/default
+  -  name: nginx restart
+     service: name=nginx state=restarted
+  -  name: nginx enable
+     service: name=nginx enabled=yes
+  -  name: setting db variable
+     lineinfile: dest=/home/ubuntu/.bashrc line='export DB_HOST=mongodb://10.0.2.190:27017/posts'
+
+```
+
+ DB dependencies
+ ```yml
+---
+- hosts: db
+  gather_facts: yes
+  become: true
+  tasks:
+  -  name: installing mongodb
+     apt:
+       pkg: mongodb
+       state: present
+       update_cache: yes
+  -  name: synchronize mongodb conf file
+     synchronize:
+       src: /home/ubuntu/app/mongodb.conf
+       dest: /etc/
+  -  name: restart mongodb
+     service: name=mongodb state=restarted
+  -  name: enable mongodb
+     service: name=mongodb enabled=yes
+
+ ```
