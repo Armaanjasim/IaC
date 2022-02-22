@@ -5,7 +5,7 @@
 
 ## Creating A Vagrantfile For Three VMs For Ansible architecture
 ### Ansible controller and Ansible agents 
-```
+```ruby
 
 # -*- mode: ruby -*-
  # vi: set ft=ruby :
@@ -180,7 +180,7 @@ aws_secret_key: SECRETKEY
 ### Playbook For Creating an EC2 Instance
 - First create a public and private key in the `.ssh` directory. Can be created by using `ssh-keygen -t rsa -b 4096`
 - create ec2 yml file:
-```
+```yml
 ---
 - hosts: localhost
   connection: local
