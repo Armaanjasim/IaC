@@ -225,7 +225,7 @@ Starting The App Playbook
 - After this is done you can get the IP from amazon ec2 instance page and put it in the hosts file
 ```
 [aws]
-<ip> ansible_connection=ssh ansible_ssh_user=ubuntu ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa.pub
+<ip> ansible_connection=ssh ansible_ssh_user=ubuntu ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa
 ```
 - After this is done you can ping to see if theres a connection by using `sudo ansible aws -m ping --ask-vault-pass`. If pong is returned you can then run the yml files you created to download nginx, node etc on the instance. Just remember to change the hosts in the yml to match aws instead of web.
 
@@ -325,3 +325,54 @@ create instance playbook
      service: name=mongodb enabled=yes
 
  ```
+# IaC Terraform
+![Terraform](Terraform.PNG)
+
+## What Is Terraform
+### Terraform Architecture
+#### Terraform default file/folder structure
+##### .gitignore
+###### AWS keys with Terraform security
+
+### Terraform commands
+- `terraform init` initialise Terraform
+- `terraform plan` checks the script
+- `terraform apply` implement the script
+- `terraform destroy` to delete everything
+
+### Terraform file/folder structure
+- `.tf` extension - `main.tf`
+- apply **DRY**
+
+### Set Up AWS keys as an ENV in windows machine
+- `AWS_ACCESS_KEY_ID` for aws access keys
+- `AWS_SECRET_ACCESS_KEY` for aws secret key
+- Click `windows` > type `env` - click `edit environment variables for your account` > click `new` > add the two aws keys
+
+### Installing Terraform
+- Open Powershell as Admin
+- Paste This:
+```
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+```
+- This downloads Chocolatey and you can check it is downloaded by choco -version
+- Once this is done use this command to install terraform `choco install terraform`
+
+### Creating An Instance With Terraform
+- Create a `main.tf` and inside it at the following:
+```GO
+provider "aws" {
+    region = "eu-west-1"
+}
+
+resource "aws_instance" "eng103a-armaan-tf-app" {
+    key_name = "eng103a-armaan-10"
+    ami = "ami-07d8796a2b0f8d29c"
+    instance_type = "t2.micro"
+    associate_public_ip_address = true
+    tags = {
+      "Name" = "eng103a-armaan-tf-app"
+    }
+
+}
+```
