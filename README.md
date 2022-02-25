@@ -505,3 +505,179 @@ resource "aws_instance" "eng103a-armaan-tf-db" {
 
 }
 ```
+
+## Using Jenkins To Create Three Instances & Configure Them
+- On the Jenkins Instance installed Ansible. [Click here to find out how](#anseible-controller-hybrid)
+- Download the ansible plugin on jenkins
+- Once this is installed click on `new item` > select `freestyle project` and then name it
+- Click on `add build step` > `Invoker Ansible Playbook` > add the playbook path `/home/ubuntu/file.yml`
+- Add the .pem file and the vault credentials
+- Click on `advanced` > `add extra variables` > In key add `ansible_python_interpreter` and in value add `/usr/bin/python3`. This makes the interpreter use python3 instead of python2
+- Do the same for all the playbooks you wish to run and then build the job. You can use `post-build-actions` to run jobs one after each other.
+
+Creating three instances yml files:
+```yml
+---
+- hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars_files:
+  - /etc/ansible/group_vars/all/pass.yml
+  vars:
+    ec2_instance_name: eng103a-armaan-ansible-app
+    ec2_sg_name: eng103a-armaan-vpc-app-sg
+    ec2_pem_name: eng103a-armaan
+  tasks:
+  - ec2_key:
+      name: "{{ec2_pem_name}}"
+      key_material: "{{ lookup('file', '/var/lib/jenkins/.ssh/eng103a-armaan.pub') }}"
+      region: "eu-west-1"
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+  - ec2:
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+      key_name: "{{ec2_pem_name}}"
+      instance_type: t2.micro
+      image: ami-07d8796a2b0f8d29c
+      wait: yes
+      group: "{{ec2_sg_name}}"
+      region: "eu-west-1"
+      count: 1
+      vpc_subnet_id: subnet-0addc13c5f0bee2bb
+      assign_public_ip: yes
+      instance_tags:
+        Name: "{{ec2_instance_name}}"
+
+```
+```yml
+---
+- hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars_files:
+  - /etc/ansible/group_vars/all/pass.yml
+  vars:
+    ec2_instance_name: eng103a-armaan-ansible-controller
+    ec2_sg_name: eng103a-armaan-vpc-controller-sg
+    ec2_pem_name: eng103a-armaan
+  tasks:
+  - ec2_key:
+      name: "{{ec2_pem_name}}"
+      key_material: "{{ lookup('file', '/var/lib/jenkins/.ssh/eng103a-armaan.pub') }}"
+      region: "eu-west-1"
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+  - ec2:
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+      key_name: "{{ec2_pem_name}}"
+      instance_type: t2.micro
+      image: ami-07d8796a2b0f8d29c
+      wait: yes
+      group: "{{ec2_sg_name}}"
+      region: "eu-west-1"
+      count: 1
+      vpc_subnet_id: subnet-0addc13c5f0bee2bb
+      assign_public_ip: yes
+      instance_tags:
+        Name: "{{ec2_instance_name}}"
+
+```
+```yml
+---
+- hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars_files:
+  - /etc/ansible/group_vars/all/pass.yml
+  vars:
+    ec2_instance_name: eng103a-armaan-ansible-db
+    ec2_sg_name: eng103a-armaan-vpc-db-sg
+    ec2_pem_name: eng103a-armaan
+  tasks:
+  - ec2_key:
+      name: "{{ec2_pem_name}}"
+      key_material: "{{ lookup('file', '/var/lib/jenkins/.ssh/eng103a-armaan.pub') }}"
+      region: "eu-west-1"
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+  - ec2:
+      aws_access_key: "{{aws_access_key}}"
+      aws_secret_key: "{{aws_secret_key}}"
+      key_name: "{{ec2_pem_name}}"
+      instance_type: t2.micro
+      image: ami-07d8796a2b0f8d29c
+      wait: yes
+      group: "{{ec2_sg_name}}"
+      region: "eu-west-1"
+      count: 1
+      vpc_subnet_id: subnet-0addc13c5f0bee2bb
+      assign_public_ip: yes
+      instance_tags:
+        Name: "{{ec2_instance_name}}"
+
+```
+
+Configuring app yml file:
+```yml
+---
+- hosts: app
+  gather_facts: yes
+  become: yes
+  tasks:
+  -  name: syncing app folder
+     synchronize:
+       src: /home/ubuntu/app
+       dest: ~/
+  -  name: upgrade
+     apt: upgrade=yes
+  -  name: load a specific version of nodejs
+     shell: curl -sl https://deb.nodesource.com/setup_6.x | sudo -E bash -
+  -  name: install the required packages
+     apt:
+       pkg:
+         - nginx
+         - nodejs
+         - npm
+       update_cache: yes
+  -  name: nginx configuration for reverse proxy
+     synchronize:
+       src: /home/ubuntu/app/default
+       dest: /etc/nginx/sites-available/default
+  -  name: nginx restart
+     service:
+       name: nginx
+       state: restarted
+  -  name: setting db variable
+     lineinfile:
+       dest: /home/ubuntu/.bashrc
+       line: 'export DB_HOST=mongodb://3.249.23.204:27017/posts'
+``` 
+
+Configuring db yml file:
+```yml
+---
+- hosts: db
+  gather_facts: yes
+  become: true
+  tasks:
+  -  name: installing mongodb
+     apt:
+       pkg: mongodb
+       state: present
+       update_cache: yes
+  -  name: synchronize mongodb conf file
+     synchronize:
+       src: /home/ubuntu/app/mongodb.conf
+       dest: /etc/
+  -  name: restart mongodb
+     service:
+       name: mongodb
+       state: restarted
+  -  name: enable mongodb
+     service:
+       name: mongodb
+       enabled: yes
+
+``` 
