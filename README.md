@@ -376,3 +376,132 @@ resource "aws_instance" "eng103a-armaan-tf-app" {
 
 }
 ```
+
+- Creating A Whole Network With Two EC2 Instances
+```GO
+provider "aws" {
+
+    region = var.instance_region
+}
+
+resource "aws_vpc" "create-vpc" {
+    cidr_block = "10.0.0.0/16"
+    instance_tenancy = "default"
+    tags = {
+        Name = "eng103a-armaan-vpc"
+    }
+}
+
+resource "aws_subnet" "create-subnet-public" {
+    vpc_id = "${aws_vpc.create-vpc.id}"
+    cidr_block = "10.0.1.0/24"
+    map_public_ip_on_launch = "true"
+    tags = {
+      "Name" = "eng103a-armaan-public-subnet"
+    }
+}
+
+resource "aws_internet_gateway" "create-ig" {
+    vpc_id = "${aws_vpc.create-vpc.id}"
+    tags = {
+      "Name" = "eng103a-armaan-ig"
+    }
+}
+
+resource "aws_route_table" "create-rt" {
+    vpc_id = "${aws_vpc.create-vpc.id}"
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = "${aws_internet_gateway.create-ig.id}"
+    }
+    tags = {
+      "Name" = "eng103a-armaan-rt"
+    }
+  
+}
+
+resource "aws_route_table_association" "create-rt-subnet-association" {
+    subnet_id = "${aws_subnet.create-subnet-public.id}"
+    route_table_id = "${aws_route_table.create-rt.id}"
+}
+
+resource "aws_security_group" "ssh-allowed" {
+    vpc_id = "${aws_vpc.create-vpc.id}"
+    egress = [{
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow port 0"
+      from_port = 0
+      ipv6_cidr_blocks = [ "::/0" ]
+      prefix_list_ids = []
+      protocol = "-1"
+      security_groups = []
+      self = false
+      to_port = 0
+    }]
+    ingress = [ {
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow port 22"
+      from_port = 22
+      ipv6_cidr_blocks = [ "::/0" ]
+      prefix_list_ids = []
+      protocol = "tcp"
+      security_groups = []
+      self = false
+      to_port = 22
+    },
+    {
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow port 80"
+      from_port = 80
+      ipv6_cidr_blocks = [ "::/0" ]
+      prefix_list_ids = []
+      protocol = "tcp"
+      security_groups = []
+      self = false
+      to_port = 80
+
+    },
+    {
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow port 80"
+      from_port = 3000
+      ipv6_cidr_blocks = [ "::/0" ]
+      prefix_list_ids = []
+      protocol = "tcp"
+      security_groups = []
+      self = false
+      to_port = 3000
+    }]
+
+    tags = {
+      "Name" = "eng103a-armaan-sg"
+    }
+
+}
+
+resource "aws_instance" "eng103a-armaan-tf-app" {
+    key_name = var.instance_key_name
+    ami = var.app_ami_id
+    instance_type = var.instance_type
+    associate_public_ip_address = var.instance_ip_status
+    subnet_id = "subnet-0addc13c5f0bee2bb"
+    vpc_security_group_ids = ["sg-055981c5fe9931976"]
+    tags = {
+      "Name" = var.instance_name_app
+    }
+
+}
+
+resource "aws_instance" "eng103a-armaan-tf-db" {
+    key_name = var.instance_key_name
+    ami = var.app_ami_id
+    instance_type = var.instance_type
+    associate_public_ip_address = var.instance_ip_status
+    subnet_id = "subnet-0addc13c5f0bee2bb"
+    vpc_security_group_ids = ["sg-055981c5fe9931976"]
+    tags = {
+      "Name" = var.instance_name_db
+    }
+
+}
+```
